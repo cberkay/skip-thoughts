@@ -20,7 +20,7 @@ path_to_model = '/u/rkiros/research/semhash/models/toydec.npz'
 path_to_dictionary = '/ais/gobi3/u/rkiros/flickr8k/dictionary.pkl'
 #-----------------------------------------------------------------------------#
 
-def load_model():
+def load_model(path_to_model, path_to_dictionary):
     """
     Load a trained model for decoding
     """
@@ -45,7 +45,7 @@ def load_model():
     # Load parameters
     print 'Loading model parameters...'
     params = init_params(options)
-    params = load_params(path_to_model, params)
+    params = load_params('%s.npz'%path_to_model, params)
     tparams = init_tparams(params)
 
     # Sampler.
