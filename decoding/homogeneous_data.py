@@ -4,7 +4,7 @@ import sys
 
 #------------------------------------------------------------------------------
 sys.path.append('/u/rkiros/research/skipthoughts/')
-import skipthoughts
+import skipthoughts.skipthoughts
 #------------------------------------------------------------------------------
 
 class HomogeneousData():
@@ -106,7 +106,8 @@ def prepare_data(caps, features, worddict, model, maxlen=None, n_words=10000):
             return None, None, None
 
     # Compute skip-thought vectors for this mini-batch
-    feat_list = skipthoughts.encode(model, feat_list, use_eos=False, verbose=False)
+    print(skipthoughts)
+    feat_list = skipthoughts.skipthoughts.encode(model, feat_list, use_eos=False, verbose=False)
 
     y = numpy.zeros((len(feat_list), len(feat_list[0]))).astype('float32')
     for idx, ff in enumerate(feat_list):
