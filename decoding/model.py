@@ -17,6 +17,9 @@ def init_params(options, preemb=None):
     """
     params = OrderedDict()
 
+    # Cluster embedding
+    params['Cemb'] = norm_weight(options['n_clusters', options['dim_word']) 
+
     # Word embedding
     if preemb == None:
         params['Wemb'] = norm_weight(options['n_words'], options['dim_word'])
@@ -51,12 +54,23 @@ def build_model(tparams, options):
     x = tensor.matrix('x', dtype='int64')
     mask = tensor.matrix('mask', dtype='float32')
     ctx = tensor.matrix('ctx', dtype='float32')
+    
+    # cluster indices: 1 x #samples
+    c_idc = tensor.vector('c_idc', dtype='int32')
+ 
+    x_flat = x.flatten()
 
     n_timesteps = x.shape[0]
     n_samples = x.shape[1]
 
+    # Index into the cluster weights matrix, shift it forward in time
+    Cemb = tparams['Cemb'][c_idc.flatten()].reshape([n_timesteps, n_samples, options['dim_word']])
+    Cemb_shifted = tensor.zeros_like(Cemb)
+    Cemb_shifted = tensor.set_subtensor(Cemb_shifted[1:], Cemb[:-1])
+    Cemb = Cemb_shifted
+
     # Index into the word embedding matrix, shift it forward in time
-    emb = tparams['Wemb'][x.flatten()].reshape([n_timesteps, n_samples, options['dim_word']])
+    emb = tparams['Wemb'][x_flat].reshape([n_timesteps, n_samples, options['dim_word']])
     emb_shifted = tensor.zeros_like(emb)
     emb_shifted = tensor.set_subtensor(emb_shifted[1:], emb[:-1])
     emb = emb_shifted
@@ -79,14 +93,13 @@ def build_model(tparams, options):
     probs = tensor.nnet.softmax(logit.reshape([logit_shp[0]*logit_shp[1], logit_shp[2]]))
 
     # Cost
-    x_flat = x.flatten()
     p_flat = probs.flatten()
     cost = -tensor.log(p_flat[tensor.arange(x_flat.shape[0])*probs.shape[1]+x_flat]+1e-8)
     cost = cost.reshape([x.shape[0], x.shape[1]])
     cost = (cost * mask).sum(0)
     cost = cost.sum()
 
-    return trng, [x, mask, ctx], cost
+    return trng, [x, mask, ctx, c_idc], cost
 
 def build_sampler(tparams, options, trng):
     """
