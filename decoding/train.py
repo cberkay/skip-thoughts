@@ -50,7 +50,8 @@ def trainer(X, C, stmodel,
             logit_output_weights=None,
             saveFreq=1000,
             sampleFreq=100,
-            reload_=False):
+            reload_=False,
+            n_clusters=10):
 
     # Model options
     model_options = {}
@@ -74,6 +75,7 @@ def trainer(X, C, stmodel,
     model_options['saveFreq'] = saveFreq
     model_options['sampleFreq'] = sampleFreq
     model_options['reload_'] = reload_
+    model_options['n_clusters'] = n_clusters
 
     print model_options
 
