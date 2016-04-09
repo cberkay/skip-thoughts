@@ -4,7 +4,7 @@ Code for sequence generation
 import numpy
 import copy
 
-def gen_sample(tparams, f_init, f_next, ctx, options, trng=None, k=1, maxlen=30,
+def gen_sample(tparams, f_init, f_next, ctx1, ctx2, options, trng=None, k=1, maxlen=30,
                stochastic=True, argmax=False, use_unk=False):
     """
     Generate a sample, using either beam search or stochastic sampling
@@ -24,7 +24,7 @@ def gen_sample(tparams, f_init, f_next, ctx, options, trng=None, k=1, maxlen=30,
     hyp_scores = numpy.zeros(live_k).astype('float32')
     hyp_states = []
 
-    next_state = f_init(ctx)
+    next_state = f_init(ctx1, ctx2)
     next_w = -1 * numpy.ones((1,)).astype('int64')
 
     for ii in xrange(maxlen):

@@ -67,8 +67,10 @@ def run_sampler(dec, c, beam_width=1, stochastic=False, use_unk=False):
     """
     Generate text conditioned on c
     """
+    ctx1, ctx2 = c
     sample, score = gen_sample(dec['tparams'], dec['f_init'], dec['f_next'],
-                               c.reshape(1, dec['options']['dimctx']), dec['options'],
+                               ctx1.reshape(1, dec['options']['dim_ctx']),
+                               ctx2.reshape(1, dec['options']['dim_ctx']), dec['options'],
                                trng=dec['trng'], k=beam_width, maxlen=1000, stochastic=stochastic,
                                use_unk=use_unk)
     text = []

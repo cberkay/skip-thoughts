@@ -18,8 +18,12 @@ def init_params(options, preemb=None, preinit=None, predec=None, preouthid=None,
     """
     params = OrderedDict()
 
+    # HACK
+    params['n_clusters'] = 10
+    params['dim_char'] = 4096
+
     # Cluster embedding
-    params['Cemb'] = norm_weight(options['n_clusters', options['dim_word']) 
+    params['Cemb'] = norm_weight(options['n_clusters'], options['dim_char'])
 
     # Word embedding
     if preemb == None:
@@ -27,9 +31,14 @@ def init_params(options, preemb=None, preinit=None, predec=None, preouthid=None,
     else:
         params['Wemb'] = preemb
 
+    # Pre-Initial state
+    params = get_layer('ff')[0](options, params, prefix='pre_ff_state',
+                                nin=options['dim_char'], nout=options['dim_ctx'],
+                                weights=preinit)
+
     # Initial state
     params = get_layer('ff')[0](options, params, prefix='ff_state',
-                                nin=options['dimctx'], nout=options['dim'],
+                                nin=options['dim_ctx'], nout=options['dim'],
                                 weights=preinit)
 
     # Decoder
@@ -51,7 +60,7 @@ def init_params(options, preemb=None, preinit=None, predec=None, preouthid=None,
                                     weights=preoutlogit)
     else:
         if preouthid:
-            print "The parameters provdided for the output hidden are unused."
+            print "The parameters provided for the output hidden are unused."
         params = get_layer('ff')[0](options, params, prefix='ff_logit',
                                     nin=options['dim'], nout=options['n_words'],
                                     weights=preoutlogit)
@@ -66,36 +75,42 @@ def build_model(tparams, options):
 
     trng = RandomStreams(1234)
 
-    # description string: #words x #samples
+    # description string: #words x #samples; identifies the words
     x = tensor.matrix('x', dtype='int64')
+
+    # description string mask: #words x #samples;
+    # which words are to be used, as dictated by the length of the sentence
     mask = tensor.matrix('mask', dtype='float32')
+
+    # 1 x dim_ctx: the encoded source (sentence, image, etc.)
     ctx = tensor.matrix('ctx', dtype='float32')
-    
+
     # cluster indices: 1 x #samples
     c_idc = tensor.vector('c_idc', dtype='int32')
- 
+
+    # flatten to 1 x (#words * #samples)
     x_flat = x.flatten()
 
     n_timesteps = x.shape[0]
     n_samples = x.shape[1]
 
-    # Index into the cluster weights matrix, shift it forward in time
-    Cemb = tparams['Cemb'][c_idc.flatten()].reshape([n_timesteps, n_samples, options['dim_word']])
-    Cemb_shifted = tensor.zeros_like(Cemb)
-    Cemb_shifted = tensor.set_subtensor(Cemb_shifted[1:], Cemb[:-1])
-    Cemb = Cemb_shifted
+    # Index into the cluster embedding matrix
+    Cemb = tparams['Cemb'][c_idc].reshape([n_samples, options['dim_char']])
 
     # Index into the word embedding matrix, shift it forward in time
-    emb = tparams['Wemb'][x_flat].reshape([n_timesteps, n_samples, options['dim_word']])
-    emb_shifted = tensor.zeros_like(emb)
-    emb_shifted = tensor.set_subtensor(emb_shifted[1:], emb[:-1])
-    emb = emb_shifted
+    Wemb = tparams['Wemb'][x_flat].reshape([n_timesteps, n_samples, options['dim_word']])
+    Wemb_shifted = tensor.zeros_like(Wemb)
+    Wemb_shifted = tensor.set_subtensor(Wemb_shifted[1:], Wemb[:-1])
+    Wemb = Wemb_shifted
+
+    # Preinit state
+    preinit_state = get_layer('ff')[1](tparams, Cemb, options, prefix='pre_ff_state', activ='tanh')
 
     # Init state
-    init_state = get_layer('ff')[1](tparams, ctx, options, prefix='ff_state', activ='tanh')
+    init_state = get_layer('ff')[1](tparams, ctx + preinit_state, options, prefix='ff_state', activ='tanh')
 
     # Decoder
-    proj = get_layer(options['decoder'])[1](tparams, emb, init_state, options,
+    proj = get_layer(options['decoder'])[1](tparams, Wemb, init_state, options,
                                             prefix='decoder',
                                             mask=mask)
 
@@ -121,12 +136,13 @@ def build_sampler(tparams, options, trng):
     """
     Forward sampling
     """
-    ctx = tensor.matrix('ctx', dtype='float32')
-    ctx0 = ctx
+    ctx1 = tensor.matrix('ctx1', dtype='float32')  # character cluster representation
+    ctx2 = tensor.matrix('ctx2', dtype='float32')  # encoded skipthoughts vector
 
     print 'Building f_init...',
-    init_state = get_layer('ff')[1](tparams, ctx, options, prefix='ff_state', activ='tanh')
-    f_init = theano.function([ctx], init_state, name='f_init', profile=False)
+    preinit_state = get_layer('ff')[1](tparams, ctx1, options, prefix='pre_ff_state', activ='tanh')
+    init_state = get_layer('ff')[1](tparams, ctx2 + preinit_state, options, prefix='ff_state', activ='tanh')
+    f_init = theano.function([ctx1, ctx2], init_state, name='f_init', profile=False)
 
     # x: 1 x 1
     y = tensor.vector('y_sampler', dtype='int64')

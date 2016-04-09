@@ -107,7 +107,7 @@ def prepare_data(caps, features, worddict, model, maxlen=None, n_words=10000):
 
     # Compute skip-thought vectors for this mini-batch
     print(skipthoughts)
-    feat_list = skipthoughts.skipthoughts.encode(model, feat_list, use_eos=False, verbose=False)
+    feat_list = [(cluster_id, skipthoughts.skipthoughts.encode(model, [feat], use_eos=False, verbose=False).flatten()) for (cluster_id, feat) in feat_list]
 
     y = numpy.zeros((len(feat_list), len(feat_list[0]))).astype('float32')
     for idx, ff in enumerate(feat_list):

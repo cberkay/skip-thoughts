@@ -4,6 +4,7 @@ Helper functions for skip-thoughts
 import theano
 import theano.tensor as tensor
 import numpy
+import warnings
 
 from collections import OrderedDict
 
@@ -25,7 +26,7 @@ def unzip(zipped):
 
 def itemlist(tparams):
     """
-    Get the list of parameters. 
+    Get the list of parameters.
     Note that tparams must be OrderedDict
     """
     return [vv for kk, vv in tparams.iteritems()]
