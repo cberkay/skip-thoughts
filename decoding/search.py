@@ -4,11 +4,13 @@ Code for sequence generation
 import numpy
 import copy
 
-def gen_sample(tparams, f_init, f_next, ctx1, ctx2, options, trng=None, k=1, maxlen=30,
+def gen_sample(tparams, f_init, f_next, c, options, trng=None, k=1, maxlen=30,
                stochastic=True, argmax=False, use_unk=False):
     """
     Generate a sample, using either beam search or stochastic sampling
     """
+    ctx1, ctx2 = c
+
     if k > 1:
         assert not stochastic, 'Beam search does not support stochastic sampling'
 

@@ -27,7 +27,8 @@ from search import gen_sample
 
 # main trainer
 def trainer(X, C, stmodel,
-            dim_ctx=4800, #vector dimensionality
+            dim_ctx=4800, # vector dimensionality
+            dim_char=4096, # character cluster vector dimensionality
             dim_word=620, # word vector dimensionality
             dim=1600, # the number of GRU units
             encoder='gru',
@@ -56,6 +57,7 @@ def trainer(X, C, stmodel,
     # Model options
     model_options = {}
     model_options['dim_ctx'] = dim_ctx
+    model_options['dim_char'] = dim_char
     model_options['dim_word'] = dim_word
     model_options['dim'] = dim
     model_options['encoder'] = encoder
@@ -250,12 +252,12 @@ def trainer(X, C, stmodel,
             if numpy.mod(uidx, sampleFreq) == 0:
                 x_s = x
                 mask_s = mask
-                ctx_s = ctx
+                ctx_s1, ctx_s2 = ctx
                 for jj in xrange(numpy.minimum(10, len(ctx_s))):
                     sample, score =\
                         gen_sample(tparams, f_init, f_next,
-                                   ctx_s[jj].reshape(1,
-                                                     model_options['dim_ctx']),
+                                   (ctx_s1[jj].reshape(1, model_options['dim_char']),
+                                   ctx_s2[jj].reshape(1, model_options['dim_ctx'])),
                                    model_options, trng=trng, k=1, maxlen=100,
                                    stochastic=False, use_unk=False)
                     print 'Truth ',jj,': ',
