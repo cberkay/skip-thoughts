@@ -18,6 +18,11 @@ def init_params(options, preemb=None, preinit=None, predec=None, preouthid=None,
     """
     params = OrderedDict()
 
+    # HACK:
+    options['n_clusters'] = 10
+    options['dim_char'] = 4096
+    #options['dim_ctx'] = options['dimctx']
+
     # Cluster embedding
     params['Cemb'] = norm_weight(options['n_clusters'], options['dim_char'])
 

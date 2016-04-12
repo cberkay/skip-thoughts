@@ -229,8 +229,11 @@ def trainer(X, C, stmodel,
                 uidx -= 1
                 continue
 
+            # HACK
+            c_idc = numpy.zeros((len(x)), dtype='int32')
+
             ud_start = time.time()
-            cost = f_grad_shared(x, mask, ctx)
+            cost = f_grad_shared(x, mask, ctx, c_idc)
             f_update(lrate)
             ud = time.time() - ud_start
 
