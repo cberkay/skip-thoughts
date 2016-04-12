@@ -81,10 +81,17 @@ def prepare_data(caps, features, worddict, model, maxlen=None, n_words=10000):
     """
     Put data into format useable by the model
     """
+
+    # Input checks
+    assert isinstance(features, tuple)
+    for i in range(len(features)):
+        assert len(features[0]) == len(features[i])
+
     seqs = []
-    # HACK:
-    if len(features) == 2:
-        features = zip(features[0], features[1])
+
+    # Turn a tuple of lists into a list of tuples
+    features = zip((features[i] for i in len(features)))
+
     feat_list = []  # now (cluster rep, source sentence)
     for i, cc in enumerate(caps):
         seqs.append([worddict[w] if worddict[w] < n_words else 1 for w in cc.split()])
@@ -109,22 +116,17 @@ def prepare_data(caps, features, worddict, model, maxlen=None, n_words=10000):
             return None, None, None
 
     # Compute skip-thought vectors for this mini-batch
-    # HACK:
     import pdb; pdb.set_trace()
-    if len(feat_list) == 2:
-        cluster_rep, feat_list = zip(*feat_list)
-    else:
-        cluster_rep = None
+    feat_list, cluster_id_list = zip(*feat_list)
     feat_list = skipthoughts.encode(model, feat_list, use_eos=False, verbose=False)
 
     y = numpy.zeros((len(feat_list), len(feat_list[0]))).astype('float32')
     for idx, ff in enumerate(feat_list):
         y[idx,:] = ff
 
-    if cluster_rep:
-        z = numpy.zeros((len(cluster_rep), len(cluster_rep[0]))).astype('float32')
-        for idx, ff in enumerate(cluster_rep):
-            z[idx,:] = ff
+    z = numpy.zeros((len(cluster_id_list), len(cluster_id_list[0]))).astype('float32')
+    for idx, ff in enumerate(cluster_id_list):
+        z[idx,:] = ff
 
     n_samples = len(seqs)
     maxlen = numpy.max(lengths)+1
@@ -135,8 +137,4 @@ def prepare_data(caps, features, worddict, model, maxlen=None, n_words=10000):
         x[:lengths[idx],idx] = s
         x_mask[:lengths[idx]+1,idx] = 1.
 
-    if cluster_rep:
-        return x, x_mask, (y, z)
-    else:
-        return x, x_mask, y
-
+    return x, x_mask, y, z

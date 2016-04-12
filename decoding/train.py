@@ -28,7 +28,7 @@ from search import gen_sample
 # main trainer
 def trainer(X, C, stmodel,
             dim_ctx=4800, # vector dimensionality
-            dim_char=4096, # character cluster vector dimensionality
+            dim_char=4096, # character representation vector dimensionality
             dim_word=620, # word vector dimensionality
             dim=1600, # the number of GRU units
             encoder='gru',
@@ -39,6 +39,7 @@ def trainer(X, C, stmodel,
             decay_c=0.,
             grad_clip=5.,
             n_words=40000,
+            n_clusters=10,
             maxlen_w=100,
             optimizer='adam',
             batch_size = 16,
@@ -51,8 +52,8 @@ def trainer(X, C, stmodel,
             logit_output_weights=None,
             saveFreq=1000,
             sampleFreq=100,
-            reload_=False,
-            n_clusters=10):
+            reload_=False
+            ):
 
     # Model options
     model_options = {}
@@ -68,6 +69,7 @@ def trainer(X, C, stmodel,
     model_options['decay_c'] = decay_c
     model_options['grad_clip'] = grad_clip
     model_options['n_words'] = n_words
+    model_options['n_clusters'] = n_clusters
     model_options['maxlen_w'] = maxlen_w
     model_options['optimizer'] = optimizer
     model_options['batch_size'] = batch_size
@@ -77,7 +79,6 @@ def trainer(X, C, stmodel,
     model_options['saveFreq'] = saveFreq
     model_options['sampleFreq'] = sampleFreq
     model_options['reload_'] = reload_
-    model_options['n_clusters'] = n_clusters
 
     print model_options
 
@@ -222,15 +223,12 @@ def trainer(X, C, stmodel,
             print 'X:', x
             print 'C:', c
 
-            x, mask, ctx = homogeneous_data.prepare_data(x, c, worddict, stmodel, maxlen=maxlen_w, n_words=n_words)
+            x, mask, ctx, c_idc = homogeneous_data.prepare_data(x, c, worddict, stmodel, maxlen=maxlen_w, n_words=n_words)
 
             if x == None:
                 print 'Minibatch with zero sample under length ', maxlen_w
                 uidx -= 1
                 continue
-
-            # HACK
-            c_idc = numpy.zeros((len(x)), dtype='int32')
 
             ud_start = time.time()
             cost = f_grad_shared(x, mask, ctx, c_idc)
@@ -255,12 +253,13 @@ def trainer(X, C, stmodel,
             if numpy.mod(uidx, sampleFreq) == 0:
                 x_s = x
                 mask_s = mask
-                ctx_s1, ctx_s2 = ctx
+                ctx_s = ctx
+                c_idc_s = c_idc
                 for jj in xrange(numpy.minimum(10, len(ctx_s))):
                     sample, score =\
                         gen_sample(tparams, f_init, f_next,
-                                   (ctx_s1[jj].reshape(1, model_options['dim_char']),
-                                   ctx_s2[jj].reshape(1, model_options['dim_ctx'])),
+                                   (ctx_s[jj].reshape(1, model_options['dim_ctx']),
+                                   c_idc_s[jj].reshape(1, 1)),
                                    model_options, trng=trng, k=1, maxlen=100,
                                    stochastic=False, use_unk=False)
                     print 'Truth ',jj,': ',

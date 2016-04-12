@@ -3,13 +3,12 @@ Model specification
 """
 import theano
 import theano.tensor as tensor
-import numpy
 
 from collections import OrderedDict
 from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
 
-from utils import _p, ortho_weight, norm_weight, tanh, relu
-from layers import get_layer, param_init_fflayer, fflayer, param_init_gru, gru_layer
+from utils import norm_weight
+from layers import get_layer
 
 def init_params(options, preemb=None, preinit=None, predec=None, preouthid=None,
                 preoutlogit=None):
@@ -72,8 +71,6 @@ def build_model(tparams, options):
     """
     Computation graph for the model
     """
-    opt_ret = dict()
-
     trng = RandomStreams(1234)
 
     # description string: #words x #samples; identifies the words
@@ -83,11 +80,11 @@ def build_model(tparams, options):
     # which words are to be used, as dictated by the length of the sentence
     mask = tensor.matrix('mask', dtype='float32')
 
-    # 1 x dim_ctx: the encoded source (sentence, image, etc.)
+    # the encoded source (sentence, image, etc.): #samples x dim_ctx
     ctx = tensor.matrix('ctx', dtype='float32')
 
     # cluster indices: 1 x #samples
-    c_idc = tensor.vector('c_idc', dtype='int32')
+    c_idc = tensor.vector('c_idc', dtype='int64')
 
     # flatten to 1 x (#words * #samples)
     x_flat = x.flatten()
@@ -137,13 +134,21 @@ def build_sampler(tparams, options, trng):
     """
     Forward sampling
     """
-    ctx1 = tensor.matrix('ctx1', dtype='float32')  # character cluster representation
-    ctx2 = tensor.matrix('ctx2', dtype='float32')  # encoded skipthoughts vector
+    # the encoded source (sentence, image, etc.): #samples x dim_ctx
+    ctx = tensor.matrix('ctx', dtype='float32')
+
+    # cluster indices: 1 x #samples
+    c_idc = tensor.vector('c_idc', dtype='int64')
+
+    # Index into the cluster embedding matrix: #sample x dim_char
+    n_samples = ctx.shape[0]
+    assert n_samples == c_idc.shape[1]
+    Cemb = tparams['Cemb'][c_idc].reshape([n_samples, options['dim_char']])
 
     print 'Building f_init...',
-    preinit_state = get_layer('ff')[1](tparams, ctx1, options, prefix='pre_ff_state', activ='tanh')
-    init_state = get_layer('ff')[1](tparams, ctx2 + preinit_state, options, prefix='ff_state', activ='tanh')
-    f_init = theano.function([ctx1, ctx2], init_state, name='f_init', profile=False)
+    preinit_state = get_layer('ff')[1](tparams, Cemb, options, prefix='pre_ff_state', activ='tanh')
+    init_state = get_layer('ff')[1](tparams, ctx + preinit_state, options, prefix='ff_state', activ='tanh')
+    f_init = theano.function([ctx, c_idc], init_state, name='f_init', profile=False)
 
     # x: 1 x 1
     y = tensor.vector('y_sampler', dtype='int64')
