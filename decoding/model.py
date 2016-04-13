@@ -142,7 +142,6 @@ def build_sampler(tparams, options, trng):
 
     # Index into the cluster embedding matrix: #sample x dim_char
     n_samples = ctx.shape[0]
-    assert n_samples == c_idc.shape[1]
     Cemb = tparams['Cemb'][c_idc].reshape([n_samples, options['dim_char']])
 
     print 'Building f_init...',

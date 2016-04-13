@@ -220,9 +220,6 @@ def trainer(X, C, stmodel,
             n_samples += len(x)
             uidx += 1
 
-            print 'X:', x
-            print 'C:', c
-
             x, mask, ctx, c_idc = homogeneous_data.prepare_data(x, c, worddict, stmodel, maxlen=maxlen_w, n_words=n_words)
 
             if x == None:
