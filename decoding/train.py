@@ -247,38 +247,38 @@ def trainer(X, C, stmodel,
                 pkl.dump(model_options, open('%s.pkl'%saveto, 'wb'))
                 print 'Done'
 
-#            if numpy.mod(uidx, sampleFreq) == 0:
-#                x_s = x
-#                mask_s = mask
-#                ctx_s = ctx
-#                c_idc_s = c_idc
-#                for jj in xrange(numpy.minimum(10, len(ctx_s))):
-#                    sample, score =\
-#                        gen_sample(tparams, f_init, f_next,
-#                                   (ctx_s[jj].reshape(1, model_options['dim_ctx']),
-#                                   c_idc_s[jj].reshape(1, 1)),
-#                                   model_options, trng=trng, k=1, maxlen=100,
-#                                   stochastic=False, use_unk=False)
-#                    print 'Truth ',jj,': ',
-#                    for vv in x_s[:,jj]:
-#                        if vv == 0:
-#                            break
-#                        if vv in word_idict:
-#                            print word_idict[vv],
-#                        else:
-#                            print 'UNK',
-#                    print
-#                    for kk, ss in enumerate([sample[0]]):
-#                        print 'Sample (', kk,') ', jj, ': ',
-#                        for vv in ss:
-#                            if vv == 0:
-#                                break
-#                            if vv in word_idict:
-#                                print word_idict[vv],
-#                            else:
-#                                print 'UNK',
-#                    print
-#
+            if numpy.mod(uidx, sampleFreq) == 0:
+                x_s = x
+                mask_s = mask
+                ctx_s = ctx
+                c_idc_s = c_idc
+                for jj in xrange(numpy.minimum(10, len(ctx_s))):
+                    sample, score =\
+                        gen_sample(tparams, f_init, f_next,
+                                   (ctx_s[jj].reshape(1, model_options['dim_ctx']),
+                                   c_idc_s[jj].reshape(1)),
+                                   model_options, trng=trng, k=1, maxlen=100,
+                                   stochastic=False, use_unk=False)
+                    print 'Truth ',jj,': ',
+                    for vv in x_s[:,jj]:
+                        if vv == 0:
+                            break
+                        if vv in word_idict:
+                            print word_idict[vv],
+                        else:
+                            print 'UNK',
+                    print
+                    for kk, ss in enumerate([sample[0]]):
+                        print 'Sample (', kk,') ', jj, ': ',
+                        for vv in ss:
+                            if vv == 0:
+                                break
+                            if vv in word_idict:
+                                print word_idict[vv],
+                            else:
+                                print 'UNK',
+                    print
+
         print 'Seen %d samples'%n_samples
 
     print 'Saving...',
