@@ -4,8 +4,17 @@ Code for sequence generation
 import numpy
 import copy
 
-def gen_sample(tparams, f_init, f_next, c, options, trng=None, k=1, maxlen=30,
-               stochastic=True, argmax=False, use_unk=False):
+def gen_sample(tparams,
+               f_init,
+               f_next,
+               c,
+               options,
+               trng=None,
+               k=1,
+               maxlen=30,
+               stochastic=True,
+               argmax=False,
+               use_unk=False):
     """
     Generate a sample, using either beam search or stochastic sampling
     """
