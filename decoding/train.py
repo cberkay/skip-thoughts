@@ -42,6 +42,7 @@ def trainer(X, C, stmodel,
             n_clusters=10,
             maxlen_w=100,
             optimizer='adam',
+            lrate=0.01,
             batch_size = 16,
             saveto='/u/rkiros/research/semhash/models/toy.npz',
             dictionary='/ais/gobi3/u/rkiros/bookgen/book_dictionary_large.pkl',
@@ -210,7 +211,6 @@ def trainer(X, C, stmodel,
     train_iter = homogeneous_data.HomogeneousData([X,C], batch_size=batch_size, maxlen=maxlen_w)
 
     uidx = 0
-    lrate = 0.01
     for eidx in xrange(max_epochs):
         n_samples = 0
 
