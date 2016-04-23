@@ -29,11 +29,12 @@ class HomogeneousData():
 
         # Turn a tuple of lists into a list of tuples
         features = self.data[1]
-        #self.feats = zip(features[i] for i in range(len(features)))
-        #self.feats = zip(features[0], features[1])
         self.feats = features
 
-        assert len(self.feats) == len(self.caps)
+        try:
+            assert len(self.feats) == len(self.caps)
+        except AssertionError:
+            self.feats = zip(*self.feats)
         assert len(self.feats[0]) == 2
 
         # find the unique lengths
