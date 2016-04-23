@@ -6,7 +6,6 @@ import theano.tensor as tensor
 
 import cPickle as pkl
 import numpy
-import copy
 
 import os
 import warnings
@@ -47,10 +46,6 @@ def trainer(X, C, stmodel,
             saveto='/u/rkiros/research/semhash/models/toy.npz',
             dictionary='/ais/gobi3/u/rkiros/bookgen/book_dictionary_large.pkl',
             embeddings=None,
-            init_weights=None,
-            decoder_weights=None,
-            hidden_output_weights=None,
-            logit_output_weights=None,
             saveFreq=1000,
             sampleFreq=100,
             reload_=False
@@ -117,42 +112,8 @@ def trainer(X, C, stmodel,
     word_idict[0] = '<eos>'
     word_idict[1] = 'UNK'
 
-    # Load pre-trained initial state weights, if applicable
-    if init_weights != None:
-        print 'Loading init weights...'
-        with open(init_weights, 'rb') as f:
-            preinit = pkl.load(f)
-    else:
-        preinit = None
-
-    # Load pre-trained decoder weights, if applicable
-    if decoder_weights != None:
-        print 'Loading decoder weights...'
-        with open(decoder_weights, 'rb') as f:
-            predec = pkl.load(f)
-    else:
-        predec = None
-
-    # Load pre-trained hidden output weights, if applicable
-    if hidden_output_weights != None:
-        print 'Loading hidden output state weights...'
-        with open(hidden_output_weights, 'rb') as f:
-            preouthid = pkl.load(f)
-    else:
-        preouthid = None
-
-    # Load pre-trained logit output weights, if applicable
-    if logit_output_weights != None:
-        print 'Loading logit output state weights...'
-        with open(logit_output_weights, 'rb') as f:
-            preoutlogit = pkl.load(f)
-    else:
-        preoutlogit = None
-
     print 'Building model'
-    params = init_params(model_options, preemb=preemb, preinit=preinit,
-                         predec=predec, preouthid=preouthid,
-                         preoutlogit=preoutlogit)
+    params = init_params(model_options, preemb=preemb)
     # reload parameters
     if reload_ and os.path.exists(saveto):
         params = load_params(saveto, params)

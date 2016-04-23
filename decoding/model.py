@@ -10,17 +10,11 @@ from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
 from utils import norm_weight
 from layers import get_layer
 
-def init_params(options, preemb=None, preinit=None, predec=None, preouthid=None,
-                preoutlogit=None):
+def init_params(options, preemb=None):
     """
     Initialize all parameters
     """
     params = OrderedDict()
-
-    # HACK:
-    options['n_clusters'] = 10
-    options['dim_char'] = 4096
-    #options['dim_ctx'] = options['dimctx']
 
     # Cluster embedding
     params['Cemb'] = norm_weight(options['n_clusters'], options['dim_char'])
@@ -37,37 +31,30 @@ def init_params(options, preemb=None, preinit=None, predec=None, preouthid=None,
 
     # Pre-Initial state
     params = get_layer('ff')[0](options, params, prefix='pre_ff_state',
-                                nin=options['dim_char'], nout=options['dim_ctx'],
-                                weights=preinit)
+                                nin=options['dim_char'],
+                                nout=options['dim_ctx'])
 
     # Initial state
     params = get_layer('ff')[0](options, params, prefix='ff_state',
-                                nin=options['dim_ctx'], nout=options['dim'],
-                                weights=preinit)
+                                nin=options['dim_ctx'], nout=options['dim'])
 
     # Decoder
     params = get_layer(options['decoder'])[0](options, params,
                                               prefix='decoder',
                                               nin=options['dim_word'],
-                                              dim=options['dim'],
-                                              weights=predec)
+                                              dim=options['dim'])
 
     # Output layer
     if options['doutput']:
         params = get_layer('ff')[0](options, params, prefix='ff_hid',
                                     nin=options['dim'],
-                                    nout=options['dim_word'],
-                                    weights=preouthid)
+                                    nout=options['dim_word'])
         params = get_layer('ff')[0](options, params, prefix='ff_logit',
                                     nin=options['dim_word'],
-                                    nout=options['n_words'],
-                                    weights=preoutlogit)
+                                    nout=options['n_words'])
     else:
-        if preouthid:
-            print "The parameters provided for the output hidden are unused."
         params = get_layer('ff')[0](options, params, prefix='ff_logit',
-                                    nin=options['dim'], nout=options['n_words'],
-                                    weights=preoutlogit)
+                                    nin=options['dim'], nout=options['n_words'])
 
     return params
 
