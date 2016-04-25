@@ -4,12 +4,18 @@ import sys
 
 #------------------------------------------------------------------------------
 sys.path.append('/u/rkiros/research/skipthoughts/')
-import skipthoughts.skipthoughts
+from skipthoughts import skipthoughts
 #------------------------------------------------------------------------------
 
 class HomogeneousData():
 
     def __init__(self, data, batch_size=128, maxlen=None):
+        """
+        Initialize this HomogeneousData item.
+
+        Assumes that data is a tuple of (list of targets, list of sources) and
+        that each source is a tuple of (raw sentence, cluster ID).
+        """
         self.batch_size = 128
         self.data = data
         self.batch_size = batch_size
@@ -20,7 +26,16 @@ class HomogeneousData():
 
     def prepare(self):
         self.caps = self.data[0]
-        self.feats = self.data[1]
+
+        # Turn a tuple of lists into a list of tuples
+        features = self.data[1]
+        self.feats = features
+
+        try:
+            assert len(self.feats) == len(self.caps)
+        except AssertionError:
+            self.feats = zip(*self.feats)
+        assert len(self.feats[0]) == 2
 
         # find the unique lengths
         self.lengths = [len(cc.split()) for cc in self.caps]
@@ -82,7 +97,8 @@ def prepare_data(caps, features, worddict, model, maxlen=None, n_words=10000):
     Put data into format useable by the model
     """
     seqs = []
-    feat_list = []
+
+    feat_list = []  # now (cluster rep, source sentence)
     for i, cc in enumerate(caps):
         seqs.append([worddict[w] if worddict[w] < n_words else 1 for w in cc.split()])
         feat_list.append(features[i])
@@ -103,15 +119,19 @@ def prepare_data(caps, features, worddict, model, maxlen=None, n_words=10000):
         seqs = new_seqs
 
         if len(lengths) < 1:
-            return None, None, None
+            return None, None, None, None
 
     # Compute skip-thought vectors for this mini-batch
-    print(skipthoughts)
-    feat_list = skipthoughts.skipthoughts.encode(model, feat_list, use_eos=False, verbose=False)
+    feat_list, cluster_id_list = zip(*feat_list)
+    feat_list = skipthoughts.encode(model, feat_list, use_eos=False, verbose=False)
 
     y = numpy.zeros((len(feat_list), len(feat_list[0]))).astype('float32')
     for idx, ff in enumerate(feat_list):
         y[idx,:] = ff
+
+    z = numpy.zeros((len(cluster_id_list))).astype('int64')
+    for idx, ff in enumerate(cluster_id_list):
+        z[idx] = ff
 
     n_samples = len(seqs)
     maxlen = numpy.max(lengths)+1
@@ -122,5 +142,4 @@ def prepare_data(caps, features, worddict, model, maxlen=None, n_words=10000):
         x[:lengths[idx],idx] = s
         x_mask[:lengths[idx]+1,idx] = 1.
 
-    return x, x_mask, y
-
+    return x, x_mask, y, z

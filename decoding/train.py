@@ -6,7 +6,6 @@ import theano.tensor as tensor
 
 import cPickle as pkl
 import numpy
-import copy
 
 import os
 import warnings
@@ -27,7 +26,8 @@ from search import gen_sample
 
 # main trainer
 def trainer(X, C, stmodel,
-            dimctx=4800, #vector dimensionality
+            dim_ctx=4800, # vector dimensionality
+            dim_char=4096, # character representation vector dimensionality
             dim_word=620, # word vector dimensionality
             dim=1600, # the number of GRU units
             encoder='gru',
@@ -38,20 +38,23 @@ def trainer(X, C, stmodel,
             decay_c=0.,
             grad_clip=5.,
             n_words=40000,
+            n_clusters=10,
             maxlen_w=100,
             optimizer='adam',
+            lrate=0.01,
             batch_size = 16,
             saveto='/u/rkiros/research/semhash/models/toy.npz',
             dictionary='/ais/gobi3/u/rkiros/bookgen/book_dictionary_large.pkl',
             embeddings=None,
             saveFreq=1000,
             sampleFreq=100,
-            reload_=False,
-            n_clusters=10):
+            reload_=False
+            ):
 
     # Model options
     model_options = {}
-    model_options['dimctx'] = dimctx
+    model_options['dim_ctx'] = dim_ctx
+    model_options['dim_char'] = dim_char
     model_options['dim_word'] = dim_word
     model_options['dim'] = dim
     model_options['encoder'] = encoder
@@ -62,6 +65,7 @@ def trainer(X, C, stmodel,
     model_options['decay_c'] = decay_c
     model_options['grad_clip'] = grad_clip
     model_options['n_words'] = n_words
+    model_options['n_clusters'] = n_clusters
     model_options['maxlen_w'] = maxlen_w
     model_options['optimizer'] = optimizer
     model_options['batch_size'] = batch_size
@@ -71,7 +75,6 @@ def trainer(X, C, stmodel,
     model_options['saveFreq'] = saveFreq
     model_options['sampleFreq'] = sampleFreq
     model_options['reload_'] = reload_
-    model_options['n_clusters'] = n_clusters
 
     print model_options
 
@@ -169,7 +172,6 @@ def trainer(X, C, stmodel,
     train_iter = homogeneous_data.HomogeneousData([X,C], batch_size=batch_size, maxlen=maxlen_w)
 
     uidx = 0
-    lrate = 0.01
     for eidx in xrange(max_epochs):
         n_samples = 0
 
@@ -179,7 +181,7 @@ def trainer(X, C, stmodel,
             n_samples += len(x)
             uidx += 1
 
-            x, mask, ctx = homogeneous_data.prepare_data(x, c, worddict, stmodel, maxlen=maxlen_w, n_words=n_words)
+            x, mask, ctx, c_idc = homogeneous_data.prepare_data(x, c, worddict, stmodel, maxlen=maxlen_w, n_words=n_words)
 
             if x == None:
                 print 'Minibatch with zero sample under length ', maxlen_w
@@ -187,7 +189,7 @@ def trainer(X, C, stmodel,
                 continue
 
             ud_start = time.time()
-            cost = f_grad_shared(x, mask, ctx)
+            cost = f_grad_shared(x, mask, ctx, c_idc)
             f_update(lrate)
             ud = time.time() - ud_start
 
@@ -210,9 +212,14 @@ def trainer(X, C, stmodel,
                 x_s = x
                 mask_s = mask
                 ctx_s = ctx
+                c_idc_s = c_idc
                 for jj in xrange(numpy.minimum(10, len(ctx_s))):
-                    sample, score = gen_sample(tparams, f_init, f_next, ctx_s[jj].reshape(1, model_options['dimctx']), model_options,
-                                               trng=trng, k=1, maxlen=100, stochastic=False, use_unk=False)
+                    sample, score =\
+                        gen_sample(tparams, f_init, f_next,
+                                   (ctx_s[jj].reshape(1, model_options['dim_ctx']),
+                                   c_idc_s[jj].reshape(1)),
+                                   model_options, trng=trng, k=1, maxlen=100,
+                                   stochastic=False, use_unk=False)
                     print 'Truth ',jj,': ',
                     for vv in x_s[:,jj]:
                         if vv == 0:

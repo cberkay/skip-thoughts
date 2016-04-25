@@ -27,16 +27,29 @@ def get_layer(name):
     return (eval(fns[0]), eval(fns[1]))
 
 # Feedforward layer
-def param_init_fflayer(options, params, prefix='ff', nin=None, nout=None, ortho=True):
+def param_init_fflayer(options, params, prefix='ff', nin=None, nout=None, ortho=True, weights=None):
     """
     Affine transformation + point-wise nonlinearity
     """
     if nin == None:
         nin = options['dim_proj']
+
     if nout == None:
         nout = options['dim_proj']
-    params[_p(prefix,'W')] = norm_weight(nin, nout, ortho=ortho)
-    params[_p(prefix,'b')] = numpy.zeros((nout,)).astype('float32')
+
+    if weights == None:
+        params[_p(prefix,'W')] = norm_weight(nin, nout, ortho=ortho)
+        params[_p(prefix,'b')] = numpy.zeros((nout,)).astype('float32')
+
+    elif weights['W'] and weights['b']:
+        assert weights['W'].shape == (nin, nout)
+        params[_p(prefix,'W')] = weights['W'].astype('float32')
+
+        assert weights['b'].shape == (nout,)
+        params[_p(prefix,'b')] = weights['b'].astype('float32')
+
+    else:
+        raise Exception
 
     return params
 
@@ -47,27 +60,55 @@ def fflayer(tparams, state_below, options, prefix='rconv', activ='lambda x: tens
     return eval(activ)(tensor.dot(state_below, tparams[_p(prefix,'W')])+tparams[_p(prefix,'b')])
 
 # GRU layer
-def param_init_gru(options, params, prefix='gru', nin=None, dim=None):
+def param_init_gru(options, params, prefix='gru', nin=None, dim=None, weights=None):
     """
     Gated Recurrent Unit (GRU)
     """
     if nin == None:
         nin = options['dim_proj']
+
     if dim == None:
         dim = options['dim_proj']
-    W = numpy.concatenate([norm_weight(nin,dim),
-                           norm_weight(nin,dim)], axis=1)
-    params[_p(prefix,'W')] = W
-    params[_p(prefix,'b')] = numpy.zeros((2 * dim,)).astype('float32')
-    U = numpy.concatenate([ortho_weight(dim),
-                           ortho_weight(dim)], axis=1)
-    params[_p(prefix,'U')] = U
 
-    Wx = norm_weight(nin, dim)
+    if weights == None:
+
+        W = numpy.concatenate([norm_weight(nin,dim),
+                            norm_weight(nin,dim)], axis=1)
+        b = numpy.zeros((2 * dim,)).astype('float32')
+        U = numpy.concatenate([ortho_weight(dim),
+                            ortho_weight(dim)], axis=1)
+
+        Wx = norm_weight(nin, dim)
+        bx = numpy.zeros((dim,)).astype('float32')
+        Ux = ortho_weight(dim)
+
+    elif weights['W'] and weights['b'] and weights['U'] and\
+        weights['Wx'] and weights['bx'] and weights['Ux']:
+
+        assert weights['W'].shape == (nin, 2*dim)
+        assert weights['b'].shape == (2*dim,)
+        assert weights['U'].shape == (dim, 2*dim)
+
+        assert weights['Wx'].shape == (nin, dim)
+        assert weights['bx'].shape == (dim,)
+        assert weights['Ux'].shape == (dim, dim)
+
+        W = weights['W'].astype('float32')
+        b = weights['b'].astype('float32')
+        U = weights['U'].astype('float32')
+        Wx = weights['Wx'].astype('float32')
+        bx = weights['bx'].astype('float32')
+        Ux = weights['Ux'].astype('float32')
+
+    else:
+        raise Exception
+
+    params[_p(prefix,'W')] = W
+    params[_p(prefix,'b')] = b
+    params[_p(prefix,'U')] = U
     params[_p(prefix,'Wx')] = Wx
-    Ux = ortho_weight(dim)
+    params[_p(prefix,'bx')] = bx
     params[_p(prefix,'Ux')] = Ux
-    params[_p(prefix,'bx')] = numpy.zeros((dim,)).astype('float32')
 
     return params
 
