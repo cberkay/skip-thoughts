@@ -63,7 +63,7 @@ def load_model(path_to_model, path_to_dictionary):
     dec['f_next'] = f_next
     return dec
 
-def run_sampler(dec, c, beam_width=1, stochastic=False, use_unk=False):
+def run_sampler(dec, c, beam_width=1, stochastic=False, use_unk=False, return_score=False):
     """
     Generate text conditioned on c
     """
@@ -76,6 +76,7 @@ def run_sampler(dec, c, beam_width=1, stochastic=False, use_unk=False):
         sample = [sample]
     for c in sample:
         text.append(' '.join([dec['word_idict'][w] for w in c[:-1]]))
-    return text
-
-
+    if not return_score:
+        return text
+    else:
+        return text, score
