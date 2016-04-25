@@ -5,6 +5,8 @@ import os
 
 import sys
 sys.path.insert(1, '/pkgs/theano-2016march1/lib/python2.7/site-packages/Theano-0.8.0rc1-py2.7.egg/')
+if '/usr/local/lib/python2.7/dist-packages/Theano-0.7.0-py2.7.egg' in sys.path:
+    sys.path.remove('/usr/local/lib/python2.7/dist-packages/Theano-0.7.0-py2.7.egg')
 import theano
 import theano.tensor as tensor
 
