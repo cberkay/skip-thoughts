@@ -25,10 +25,6 @@ def init_params(options, preemb=None):
     else:
         params['Wemb'] = preemb
 
-    # HACK
-    if not 'dim_ctx' in options:
-        options['dim_ctx'] = options['dimctx']
-
     # Pre-Initial state
     params = get_layer('ff')[0](options, params, prefix='pre_ff_state',
                                 nin=options['dim_char'],

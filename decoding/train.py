@@ -7,10 +7,14 @@ import theano.tensor as tensor
 import cPickle as pkl
 import numpy
 
+import datetime
+import errno
 import os
-import warnings
+import pprint
+import pwd
 import sys
 import time
+import warnings
 
 import homogeneous_data
 
@@ -34,7 +38,7 @@ def trainer(X, C, stmodel,
             decoder='gru',
             doutput=False,
             max_epochs=5,
-            dispFreq=1,
+            dispFreq=10,
             decay_c=0.,
             grad_clip=5.,
             n_words=40000,
@@ -45,6 +49,7 @@ def trainer(X, C, stmodel,
             batch_size = 16,
             saveto='/u/rkiros/research/semhash/models/toy.npz',
             dictionary='/ais/gobi3/u/rkiros/bookgen/book_dictionary_large.pkl',
+            exp_log_name=None,
             embeddings=None,
             saveFreq=1000,
             sampleFreq=100,
@@ -76,20 +81,58 @@ def trainer(X, C, stmodel,
     model_options['sampleFreq'] = sampleFreq
     model_options['reload_'] = reload_
 
-    print model_options
-
     # reload options
     if reload_ and os.path.exists(saveto):
-        print 'reloading...' + saveto
+        print 'Reloading model options...' + saveto
         with open('%s.pkl'%saveto, 'rb') as f:
-            models_options = pkl.load(f)
+            model_options = pkl.load(f)
+
+    print model_options
+
+    def mkdir_p(path):
+        try:
+            os.makedirs(path)
+        except OSError as exc:
+            if exc.errno == errno.EEXIST and os.path.isdir(path):
+                pass
+            else:
+                raise
+
+    # Deep dashboard logging
+    if exp_log_name is not None:
+        username = pwd.getpwuid(os.getuid())[0]
+
+        main_catalogue_path = os.path.join('/u/%s/public_html/' % username,
+                                           'catalog')
+        if os.path.exists(main_catalogue_path):
+            with open(main_catalogue_path, 'a') as f:
+                f.write('%s\n' % exp_log_name)
+        else:
+            with open(main_catalogue_path, 'w') as f:
+                f.write('id\n')
+                f.write('%s\n' % exp_log_name)
+
+        log_dir = os.path.join('/u/%s/public_html/results/' % username,
+                               exp_log_name)
+        mkdir_p(log_dir)
+        with open(os.path.join(log_dir, 'catalog'), 'w') as f:
+            f.write('filename,type,name\n')
+            f.write('info.txt,plain,experiment info\n')
+            f.write('training_cost.csv,csv,overall training cost\n')
+            f.write('samples.txt,plain,training samples\n')
+
+        with open(os.path.join(log_dir, 'info.txt'), 'w') as f:
+            f.write(pprint.pformat(model_options))
+
+        with open(os.path.join(log_dir, 'training_cost.csv'), 'w') as f:
+            f.write('step,time,cost\n')
 
     # load dictionary
     print 'Loading dictionary...'
     worddict = load_dictionary(dictionary)
 
     # Load pre-trained embeddings, if applicable
-    if embeddings != None:
+    if embeddings is not None:
         print 'Loading embeddings...'
         with open(embeddings, 'rb') as f:
             embed_map = pkl.load(f)
@@ -112,7 +155,7 @@ def trainer(X, C, stmodel,
     word_idict[0] = '<eos>'
     word_idict[1] = 'UNK'
 
-    print 'Building model'
+    print 'Building model...'
     params = init_params(model_options, preemb=preemb)
     # reload parameters
     if reload_ and os.path.exists(saveto):
@@ -124,6 +167,7 @@ def trainer(X, C, stmodel,
 
     print 'Building sampler'
     f_init, f_next = build_sampler(tparams, model_options, trng)
+    print 'Done'
 
     # before any regularizer
     print 'Building f_log_probs...',
@@ -144,11 +188,11 @@ def trainer(X, C, stmodel,
     f_cost = theano.function(inps, cost, profile=False)
     print 'Done'
 
-    print 'Done'
     print 'Building f_grad...',
     grads = tensor.grad(cost, wrt=itemlist(tparams))
     f_grad_norm = theano.function(inps, [(g**2).sum() for g in grads], profile=False)
     f_weight_norm = theano.function([], [(t**2).sum() for k,t in tparams.iteritems()], profile=False)
+    print 'Done'
 
     if grad_clip > 0.:
         g2 = 0.
@@ -165,14 +209,24 @@ def trainer(X, C, stmodel,
     print 'Building optimizers...',
     # (compute gradients), (updates parameters)
     f_grad_shared, f_update = eval(optimizer)(lr, tparams, grads, inps, cost)
-
-    print 'Optimization'
+    print 'Done'
 
     # Each sentence in the minibatch have same length (for encoder)
     train_iter = homogeneous_data.HomogeneousData([X,C], batch_size=batch_size, maxlen=maxlen_w)
 
     uidx = 0
+    ud_times = numpy.zeros(len(train_iter)*max_epochs, dtype=numpy.float32)
+
     for eidx in xrange(max_epochs):
+
+        if exp_log_name is not None:
+
+            with open(os.path.join(log_dir, 'catalog'), 'a') as f:
+                f.write('epoch_%d_cost.csv,csv,training cost during epoch %d\n' % ((eidx + 1), (eidx + 1)))
+
+            with open(os.path.join(log_dir, 'epoch_%d_cost.csv' % (eidx + 1)), 'w') as f:
+                f.write('step,time,cost\n')
+
         n_samples = 0
 
         print 'Epoch ', eidx
@@ -192,15 +246,29 @@ def trainer(X, C, stmodel,
             cost = f_grad_shared(x, mask, ctx, c_idc)
             f_update(lrate)
             ud = time.time() - ud_start
+            ud_times[uidx - 1] = ud
 
             if numpy.isnan(cost) or numpy.isinf(cost):
                 print 'NaN detected'
                 return 1., 1., 1.
 
             if numpy.mod(uidx, dispFreq) == 0:
-                print 'Epoch ', eidx, 'Update ', uidx, 'Cost ', cost, 'UD ', ud
+                print 'Epoch ', eidx, 'Update ', uidx, 'Cost ', cost, 'Duration ', ud, 'Cum. Av. Dur. ', numpy.mean(ud_times[:uidx])
 
-            if numpy.mod(uidx, saveFreq) == 0:
+                if exp_log_name is not None:
+                    with open(os.path.join(log_dir, 'epoch_%d_cost.csv' % (eidx + 1)), 'a') as f:
+                        f.write('%d,%s,%f\n' %\
+                                (uidx,
+                                 datetime.datetime.utcnow().isoformat(),
+                                 cost))
+
+                    with open(os.path.join(log_dir, 'training_cost.csv'), 'a') as f:
+                        f.write('%d,%s,%f\n' %\
+                                (uidx,
+                                 datetime.datetime.utcnow().isoformat(),
+                                 cost))
+
+            if saveFreq is not None and numpy.mod(uidx, saveFreq) == 0:
                 print 'Saving...',
 
                 params = unzip(tparams)
@@ -209,11 +277,18 @@ def trainer(X, C, stmodel,
                 print 'Done'
 
             if numpy.mod(uidx, sampleFreq) == 0:
+
+                if exp_log_name is not None:
+                    f = open(os.path.join(log_dir, 'samples.txt'), 'a')
+                    f.write('Epoch %d Update %d\n\n' % ((eidx + 1), uidx))
+
                 x_s = x
                 mask_s = mask
                 ctx_s = ctx
                 c_idc_s = c_idc
                 for jj in xrange(numpy.minimum(10, len(ctx_s))):
+                    truth = []
+                    sampled = []
                     sample, score =\
                         gen_sample(tparams, f_init, f_next,
                                    (ctx_s[jj].reshape(1, model_options['dim_ctx']),
@@ -225,9 +300,11 @@ def trainer(X, C, stmodel,
                         if vv == 0:
                             break
                         if vv in word_idict:
-                            print word_idict[vv],
+                            word = word_idict[vv]
                         else:
-                            print 'UNK',
+                            word = 'UNK'
+                        truth.append(word)
+                        print word,
                     print
                     for kk, ss in enumerate([sample[0]]):
                         print 'Sample (', kk,') ', jj, ': ',
@@ -235,18 +312,30 @@ def trainer(X, C, stmodel,
                             if vv == 0:
                                 break
                             if vv in word_idict:
-                                print word_idict[vv],
+                                word = word_idict[vv]
                             else:
-                                print 'UNK',
+                                word = 'UNK'
+                            print word,
+                            sampled.append(word)
                     print
+
+                    f.write('\tTruth %d: %s\n'.encode('utf-8') % (jj, ' '.join(truth)))
+                    f.write('\tSample %d: %s\n'.encode('utf-8') % (jj, ' '.join(sampled)))
+                    f.write('\n')
+
+                f.write('\n\n')
+                f.close()
 
         print 'Seen %d samples'%n_samples
 
-    print 'Saving...',
+    if saveFreq is not None:
 
-    params = unzip(tparams)
-    numpy.savez(saveto, history_errs=[], **params)
-    pkl.dump(model_options, open('%s.pkl'%saveto, 'wb'))
+        print 'Saving...',
+
+        params = unzip(tparams)
+        numpy.savez(saveto, history_errs=[], **params)
+        pkl.dump(model_options, open('%s.pkl'%saveto, 'wb'))
+
     print 'Done'
 
 if __name__ == '__main__':

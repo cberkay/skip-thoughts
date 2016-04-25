@@ -24,6 +24,14 @@ class HomogeneousData():
         self.prepare()
         self.reset()
 
+    def __len__(self):
+        try:
+            assert len(self.data[0]) == len(self.data[1])
+        except AssertionError:
+            assert len(self.data[0]) == len(self.data[1][0])
+            assert len(self.data[0]) == len(self.data[1][1])
+        return len(self.data[0])
+
     def prepare(self):
         self.caps = self.data[0]
 
